@@ -143,22 +143,22 @@ with tab_detail:
                                     dict(step="all", label="tudo")]),
     )
     fig.update_layout(height=420, yaxis_title="°C", margin=dict(l=10, r=10, t=40, b=10))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.caption("Faixas laranja: eventos simulados (a causa real seria registrada pela equipe da UBS). "
                "Faixas cinza: porta aberta.")
     st.markdown("**Excursões desta câmara**")
     st.dataframe(incident_table(inc[inc.fridge_id == fid], now).drop(columns=["UBS", "Câmara"]),
-                 hide_index=True, use_container_width=True)
+                 hide_index=True, width="stretch")
 
 with tab_incidents:
     only = st.toggle("Só incidentes (acima da tolerância)", value=True)
     view = inc[inc.is_incident] if only else inc
     table = incident_table(view, now)
-    st.dataframe(table, hide_index=True, use_container_width=True)
+    st.dataframe(table, hide_index=True, width="stretch")
     by_ubs = (view.groupby("ubs").minutes.agg(["count", "sum"])
               .rename(columns={"count": "Incidentes", "sum": "Minutos fora"}).round(0).astype(int))
     by_ubs.index.name = "UBS"
     st.subheader("Por UBS")
-    st.dataframe(by_ubs.sort_values("Minutos fora", ascending=False), use_container_width=True)
+    st.dataframe(by_ubs.sort_values("Minutos fora", ascending=False), width="stretch")
     st.download_button("Baixar CSV (relatório de conformidade)", table.to_csv(index=False).encode("utf-8-sig"),
                        "incidentes_rede_de_frio.csv", "text/csv")
