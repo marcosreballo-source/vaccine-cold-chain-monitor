@@ -38,6 +38,24 @@ with st.sidebar:
     st.caption("Faixa de conservação: +2 °C a +8 °C (Manual de Rede de Frio / PNI).")
     st.caption("Dados **simulados** para demonstração; UBS e leituras são fictícias.")
 
+def incident_table(df: pd.DataFrame, now: pd.Timestamp) -> pd.DataFrame:
+    """Tabela legível: datas no formato brasileiro, excursão em andamento sinalizada."""
+    cols = ["UBS", "Câmara", "Início", "Fim", "Duração (min)", "Pico (°C)", "Excursão", "Incidente"]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+    ongoing = df.end >= now
+    return pd.DataFrame({
+        "UBS": df.ubs,
+        "Câmara": df.fridge_id,
+        "Início": df.start.dt.strftime("%d/%m %H:%M"),
+        "Fim": df.end.dt.strftime("%d/%m %H:%M").where(~ongoing, "em andamento"),
+        "Duração (min)": df.minutes.round(0).astype(int),
+        "Pico (°C)": df.peak_c.round(1),
+        "Excursão": df.direction,
+        "Incidente": df.is_incident.map({True: "sim", False: "não (curta)"}),
+    })
+
+
 readings, fridges, events = load(days, int(seed))
 now = readings.timestamp.max()
 status = fridge_status(readings, fridges, now, th)
@@ -57,24 +75,27 @@ c[4].metric("Doses a avaliar", f"{doses_at_risk(status, inc, now):,}".replace(",
 tab_overview, tab_detail, tab_incidents = st.tabs(["Visão geral", "Câmara", "Incidentes"])
 
 with tab_overview:
-    cols = st.columns(4)
+    cols = st.columns(3)
     for i, row in enumerate(status.itertuples()):
-        with cols[i % 4]:
+        with cols[i % 3]:
             color = STATUS_COLOR[row.status]
             eta = f"<br>⏱ sai da faixa em ~{row.min_para_sair_da_faixa:.0f} min" if row.min_para_sair_da_faixa is not None and row.status == "ATENÇÃO" else ""
             temp = "—" if pd.isna(row.temp_atual) or row.status == "OFFLINE" else f"{row.temp_atual:.1f} °C"
             st.markdown(
                 f"""<div style="border-left:6px solid {color};padding:8px 12px;margin-bottom:10px;
                 border-radius:6px;background:rgba(127,127,127,0.08)">
-                <b>{row.ubs}</b> <span style="opacity:.7">({row.fridge_id})</span><br>
-                <span style="font-size:1.6em">{temp}</span>
-                <span style="color:{color};font-weight:600;float:right">{row.status}</span><br>
-                <span style="opacity:.75">24h: {row.min_24h:.1f}–{row.max_24h:.1f} °C ·
-                em faixa {row.tempo_em_faixa_24h_pct:.0f}%</span>{eta}</div>""",
+                <span style="background:{color};color:white;font-size:.75em;font-weight:700;
+                padding:1px 8px;border-radius:10px">{row.status}</span>
+                <span style="opacity:.6;font-size:.8em">{row.fridge_id}</span><br>
+                <b>{row.ubs}</b><br>
+                <span style="font-size:1.6em">{temp}</span><br>
+                <span style="opacity:.75;font-size:.85em">24h: {row.min_24h:.1f} a {row.max_24h:.1f} °C ·
+                {int(row.tempo_em_faixa_24h_pct)}% em faixa</span>{eta}</div>""",
                 unsafe_allow_html=True,
             )
-    st.subheader("Tempo em faixa nas últimas 24 h")
-    st.bar_chart(status.set_index("fridge_id")["tempo_em_faixa_24h_pct"], height=220)
+    st.subheader("Minutos fora da faixa nas últimas 24 h")
+    out = status.assign(label=status.fridge_id + " · " + status.ubs).set_index("label")["min_fora_24h"]
+    st.bar_chart(out.sort_values(ascending=False), height=260, horizontal=True)
 
 with tab_detail:
     # ordem por gravidade: abre direto na câmara mais crítica
@@ -92,8 +113,10 @@ with tab_detail:
         if e.kind == "door_open":  # frequente: só sombreia, sem rótulo
             fig.add_vrect(x0=e.start, x1=x1, fillcolor="gray", opacity=0.08, line_width=0)
         else:
+            # perto do fim do gráfico o rótulo cresce para a esquerda, senão é cortado
+            pos = "top right" if x1 > now - pd.Timedelta(hours=3) else "top left"
             fig.add_vrect(x0=e.start, x1=x1, fillcolor="orange", opacity=0.15, line_width=0,
-                          annotation_text=CAUSE[e.kind], annotation_position="top left", annotation_font_size=10)
+                          annotation_text=CAUSE[e.kind], annotation_position=pos, annotation_font_size=10)
     fig.update_xaxes(
         range=[now - pd.Timedelta(hours=24), now],
         rangeselector=dict(buttons=[dict(count=6, label="6h", step="hour", stepmode="backward"),
@@ -103,20 +126,21 @@ with tab_detail:
     )
     fig.update_layout(height=420, yaxis_title="°C", margin=dict(l=10, r=10, t=40, b=10))
     st.plotly_chart(fig, use_container_width=True)
-    st.caption("Faixas laranja: eventos simulados (a causa real seria registrada pela equipe da UBS).")
-    st.dataframe(inc[inc.fridge_id == fid].drop(columns=["fridge_id"]), hide_index=True, use_container_width=True)
+    st.caption("Faixas laranja: eventos simulados (a causa real seria registrada pela equipe da UBS). "
+               "Faixas cinza: porta aberta.")
+    st.markdown("**Excursões desta câmara**")
+    st.dataframe(incident_table(inc[inc.fridge_id == fid], now).drop(columns=["UBS", "Câmara"]),
+                 hide_index=True, use_container_width=True)
 
 with tab_incidents:
     only = st.toggle("Só incidentes (acima da tolerância)", value=True)
     view = inc[inc.is_incident] if only else inc
-    st.dataframe(
-        view[["ubs", "fridge_id", "start", "end", "minutes", "peak_c", "direction"]]
-        .rename(columns={"ubs": "UBS", "fridge_id": "Câmara", "start": "Início", "end": "Fim",
-                         "minutes": "Duração (min)", "peak_c": "Pico (°C)", "direction": "Excursão"}),
-        hide_index=True, use_container_width=True,
-    )
-    by_ubs = view.groupby("ubs").minutes.agg(["count", "sum"]).rename(columns={"count": "incidentes", "sum": "minutos fora"})
+    table = incident_table(view, now)
+    st.dataframe(table, hide_index=True, use_container_width=True)
+    by_ubs = (view.groupby("ubs").minutes.agg(["count", "sum"])
+              .rename(columns={"count": "Incidentes", "sum": "Minutos fora"}).round(0).astype(int))
+    by_ubs.index.name = "UBS"
     st.subheader("Por UBS")
-    st.dataframe(by_ubs.sort_values("minutos fora", ascending=False), use_container_width=True)
-    st.download_button("Baixar CSV (relatório de conformidade)", view.to_csv(index=False).encode("utf-8"),
+    st.dataframe(by_ubs.sort_values("Minutos fora", ascending=False), use_container_width=True)
+    st.download_button("Baixar CSV (relatório de conformidade)", table.to_csv(index=False).encode("utf-8-sig"),
                        "incidentes_rede_de_frio.csv", "text/csv")
