@@ -2,6 +2,8 @@
 
 Este é um painel que acompanha a temperatura das câmaras de vacina das UBS e avisa antes que o problema vire perda. O foco é o tempo de reação. Hoje, o controle manual (leitura cerca de 3 vezes ao dia) só descobre uma excursão horas depois. O painel mostra em minutos e, quando a temperatura vem subindo, **antes** de sair da faixa.
 
+**▶ Demo online:** https://vaccine-cold-chain-monitor.streamlit.app/
+
 ![Visão geral](docs/visao_geral.jpg)
 
 ## O problema
