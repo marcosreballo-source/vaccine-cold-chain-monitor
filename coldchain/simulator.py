@@ -19,6 +19,8 @@ UBS_NAMES = [
     "UBS Botafogo", "UBS Santa Eudóxia", "UBS Água Vermelha",
 ]  # bairros de São Carlos; unidades e dados são fictícios
 
+INVENTORY_SEED = 7  # rede fixa de UBS/câmaras, independente do cenário simulado
+
 
 @dataclass(frozen=True)
 class Event:
@@ -78,7 +80,8 @@ def simulate(days: int = 7, freq_s: int = 60, n_ubs: int = 11, seed: int = 7,
     end = (end or pd.Timestamp.now(tz="America/Sao_Paulo")).floor("min")
     start = end - pd.Timedelta(days=days)
     idx = pd.date_range(start, end, freq=f"{freq_s}s", inclusive="left")
-    fridges = build_fridges(n_ubs, seed)
+    # O inventário (UBS e câmaras) é fixo: o `seed` muda só o cenário de eventos.
+    fridges = build_fridges(n_ubs, INVENTORY_SEED)
     events = schedule_events(fridges, start, days, seed)
     if live:
         events = sorted(events + live_events(fridges, end, seed), key=lambda e: e.start)

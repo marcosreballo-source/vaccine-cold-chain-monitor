@@ -81,12 +81,15 @@ def minutes_to_exit(series: pd.Series, times: pd.Series, th: Thresholds = Thresh
 
 
 def fridge_status(readings: pd.DataFrame, fridges: pd.DataFrame, now: pd.Timestamp,
-                  th: Thresholds = Thresholds()) -> pd.DataFrame:
-    """Estado atual de cada geladeira: OK, ATENÇÃO (tendência de saída), ALARME (fora da faixa) ou OFFLINE."""
+                  th: Thresholds = Thresholds(), window_hours: float = 24) -> pd.DataFrame:
+    """Estado atual de cada geladeira: OK, ATENÇÃO (tendência de saída), ALARME (fora da faixa) ou OFFLINE.
+
+    Mínimo, máximo, tempo em faixa e minutos fora são calculados sobre as últimas `window_hours`.
+    """
     rows = []
-    last_24h = readings[readings.timestamp > now - pd.Timedelta(hours=24)]
+    period = readings[readings.timestamp > now - pd.Timedelta(hours=window_hours)]
     for f in fridges.itertuples():
-        g = last_24h[last_24h.fridge_id == f.fridge_id].sort_values("timestamp")
+        g = period[period.fridge_id == f.fridge_id].sort_values("timestamp")
         valid = g.dropna(subset=["temp_c"])
         last_seen = valid.timestamp.max() if len(valid) else pd.NaT
         current = valid.temp_c.iloc[-1] if len(valid) else np.nan
@@ -108,8 +111,8 @@ def fridge_status(readings: pd.DataFrame, fridges: pd.DataFrame, now: pd.Timesta
             status = "OK"
         rows.append({
             "fridge_id": f.fridge_id, "ubs": f.ubs, "model": f.model, "doses_stored": f.doses_stored,
-            "status": status, "temp_atual": current, "min_24h": valid.temp_c.min(), "max_24h": valid.temp_c.max(),
-            "tempo_em_faixa_24h_pct": tir, "min_fora_24h": float((~in_range).sum() * step_min),
+            "status": status, "temp_atual": current, "min_periodo": valid.temp_c.min(), "max_periodo": valid.temp_c.max(),
+            "tempo_em_faixa_pct": tir, "min_fora": float((~in_range).sum() * step_min),
             "min_para_sair_da_faixa": eta, "ultima_leitura": last_seen,
         })
     order = {"ALARME": 0, "OFFLINE": 1, "ATENÇÃO": 2, "OK": 3}

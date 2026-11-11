@@ -28,12 +28,19 @@ def load(days: int, seed: int):
 
 with st.sidebar:
     st.header("Configuração")
-    days = st.slider("Histórico (dias)", 1, 14, 7)
-    seed = st.number_input("Cenário (seed)", 1, 999, 7, help="Muda o cenário simulado")
+    days = st.slider("Período analisado (dias)", 1, 14, 7,
+                     help="Muda as estatísticas dos cartões, os incidentes e os gráficos.")
+    seed = st.number_input("Cenário simulado", 1, 999, 7,
+                           help="Sorteia outra semana de eventos (quedas de energia, portas abertas, falhas). "
+                                "As UBS e câmaras são sempre as mesmas.")
     st.divider()
     th = Thresholds(
-        incident_min_minutes=st.slider("Excursão vira incidente após (min)", 1, 60, 10),
-        forecast_horizon_minutes=st.slider("Alerta antecipado: horizonte (min)", 15, 180, 60),
+        incident_min_minutes=st.slider("Excursão vira incidente após (min)", 1, 60, 10,
+                                       help="Excursões mais curtas (ex.: porta aberta por instantes) são "
+                                            "registradas, mas não contam como incidente."),
+        forecast_horizon_minutes=st.slider("Alerta antecipado: horizonte (min)", 15, 180, 60,
+                                           help="Câmara entra em ATENÇÃO se a tendência indicar saída da "
+                                                "faixa dentro deste horizonte."),
     )
     st.caption("Faixa de conservação: +2 °C a +8 °C (Manual de Rede de Frio / PNI).")
     st.caption("Dados **simulados** para demonstração; UBS e leituras são fictícias.")
@@ -58,8 +65,10 @@ def incident_table(df: pd.DataFrame, now: pd.Timestamp) -> pd.DataFrame:
 
 readings, fridges, events = load(days, int(seed))
 now = readings.timestamp.max()
-status = fridge_status(readings, fridges, now, th)
+status = fridge_status(readings, fridges, now, th, window_hours=days * 24)
 inc = incidents(readings, th).merge(fridges[["fridge_id", "ubs"]], on="fridge_id")
+# rótulo amigável: "Câmara 1", "Câmara 2" dentro de cada UBS
+status["camara"] = "Câmara " + status.fridge_id.str[-1]
 
 st.title("🧊 Rede de Frio — UBS São Carlos")
 st.caption(f"Última leitura: {now:%d/%m/%Y %H:%M} · {len(fridges)} câmaras em {fridges.ubs.nunique()} UBS · leitura a cada 1 min")
@@ -69,39 +78,48 @@ counts = status.status.value_counts()
 c[0].metric("Em alarme", int(counts.get("ALARME", 0)))
 c[1].metric("Atenção (tendência)", int(counts.get("ATENÇÃO", 0)))
 c[2].metric("Offline", int(counts.get("OFFLINE", 0)))
-c[3].metric("Incidentes no período", int(inc.is_incident.sum()))
+c[3].metric(f"Incidentes em {days} d", int(inc.is_incident.sum()),
+            help=f"Excursões de {th.incident_min_minutes} min ou mais. Total de excursões: {len(inc)}.")
 c[4].metric("Doses a avaliar", f"{doses_at_risk(status, inc, now):,}".replace(",", "."))
 
 tab_overview, tab_detail, tab_incidents = st.tabs(["Visão geral", "Câmara", "Incidentes"])
 
 with tab_overview:
+    # um cartão por UBS (com suas câmaras dentro), do pior status para o melhor
+    order = {"ALARME": 0, "OFFLINE": 1, "ATENÇÃO": 2, "OK": 3}
+    ubs_rank = status.assign(r=status.status.map(order)).groupby("ubs").r.min().sort_values(kind="stable")
     cols = st.columns(3)
-    for i, row in enumerate(status.itertuples()):
+    for i, ubs in enumerate(ubs_rank.index):
+        rows = status[status.ubs == ubs].sort_values("camara")
+        worst = rows.status.map(order).idxmin()
+        color = STATUS_COLOR[rows.loc[worst, "status"]]
+        lines = []
+        for r in rows.itertuples():
+            temp = "sem sinal" if r.status == "OFFLINE" or pd.isna(r.temp_atual) else f"{r.temp_atual:.1f} °C"
+            eta = (f" · ⏱ sai da faixa em ~{r.min_para_sair_da_faixa:.0f} min"
+                   if r.status == "ATENÇÃO" and r.min_para_sair_da_faixa is not None else "")
+            lines.append(
+                f"""<div style="margin-top:6px"><span style="background:{STATUS_COLOR[r.status]};color:white;
+                font-size:.7em;font-weight:700;padding:1px 7px;border-radius:9px">{r.status}</span>
+                <span style="opacity:.85">{r.camara}</span><br>
+                <b style="font-size:1.3em;white-space:nowrap">{temp}</b><span style="font-size:.85em">{eta}</span><br>
+                <span style="opacity:.7;font-size:.8em">{days} d: {r.min_periodo:.1f} a {r.max_periodo:.1f} °C ·
+                {int(r.tempo_em_faixa_pct)}% em faixa · {r.min_fora:.0f} min fora</span></div>"""
+            )
         with cols[i % 3]:
-            color = STATUS_COLOR[row.status]
-            eta = f"<br>⏱ sai da faixa em ~{row.min_para_sair_da_faixa:.0f} min" if row.min_para_sair_da_faixa is not None and row.status == "ATENÇÃO" else ""
-            temp = "—" if pd.isna(row.temp_atual) or row.status == "OFFLINE" else f"{row.temp_atual:.1f} °C"
             st.markdown(
                 f"""<div style="border-left:6px solid {color};padding:8px 12px;margin-bottom:10px;
-                border-radius:6px;background:rgba(127,127,127,0.08)">
-                <span style="background:{color};color:white;font-size:.75em;font-weight:700;
-                padding:1px 8px;border-radius:10px">{row.status}</span>
-                <span style="opacity:.6;font-size:.8em">{row.fridge_id}</span><br>
-                <b>{row.ubs}</b><br>
-                <span style="font-size:1.6em">{temp}</span><br>
-                <span style="opacity:.75;font-size:.85em">24h: {row.min_24h:.1f} a {row.max_24h:.1f} °C ·
-                {int(row.tempo_em_faixa_24h_pct)}% em faixa</span>{eta}</div>""",
+                border-radius:6px;background:rgba(127,127,127,0.08)"><b>{ubs}</b>{''.join(lines)}</div>""",
                 unsafe_allow_html=True,
             )
-    st.subheader("Minutos fora da faixa nas últimas 24 h")
-    out = status.assign(label=status.fridge_id + " · " + status.ubs).set_index("label")["min_fora_24h"]
+    st.subheader(f"Minutos fora da faixa ({days} dias)")
+    out = status.assign(label=status.ubs + " · " + status.camara).set_index("label")["min_fora"]
     st.bar_chart(out.sort_values(ascending=False), height=260, horizontal=True)
 
 with tab_detail:
     # ordem por gravidade: abre direto na câmara mais crítica
-    options = [f"{r.fridge_id} · {r.ubs} · {r.status}" for r in status.itertuples()]
-    choice = st.selectbox("Câmara", options)
-    fid = choice.split(" · ")[0]
+    labels = {f"{r.ubs} · {r.camara} · {r.status}": r.fridge_id for r in status.itertuples()}
+    fid = labels[st.selectbox("Câmara", list(labels))]
     g = readings[readings.fridge_id == fid]
     fig = go.Figure()
     fig.add_hrect(y0=th.low, y1=th.high, fillcolor="green", opacity=0.08, line_width=0)
