@@ -47,4 +47,4 @@ pytest            # 7 testes: regras (incidentes, alerta antecipado, status, dos
 
 ## Origem
 
-Este painel nasceu do trabalho final de **SSC0530 – Introdução a Sistemas de Informação** (ICMC/USP). O trabalho fez o levantamento do problema na rede de frio das UBS de São Carlos, a especificação técnica, a análise de custos e o protótipo de telas no Figma. Aquele trabalho parou no mockup. Este repositório implementa o painel e as regras de alerta. <!-- TODO: autores do trabalho original / link do Figma, se o colega autorizar -->
+Este painel nasceu do trabalho final de **SSC0530 – Introdução a Sistemas de Informação** (ICMC/USP). O trabalho fez o levantamento do problema na rede de frio das UBS de São Carlos, a especificação técnica, a análise de custos e o protótipo de telas no Figma. Aquele trabalho parou no mockup ([protótipo no Figma](https://www.figma.com/proto/Ngcu92GsupdBB0KtYSKLar/Vacinas-Mobile?node-id=1-2&scaling=scale-down&content-scaling=fixed&page-id=0%3A1), feito pelo grupo da disciplina). Este repositório implementa o painel e as regras de alerta.
