@@ -8,8 +8,6 @@ Faixa de conservação de vacinas (PNI / Manual de Rede de Frio): +2 °C a +8 °
 - Offline: sem leitura há mais de N minutos (sensor, Wi-Fi ou energia do ESP32).
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import numpy as np

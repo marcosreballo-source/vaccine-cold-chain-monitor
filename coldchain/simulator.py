@@ -6,8 +6,6 @@ ruído do sensor (DS18B20, ±0,5 °C), e eventos que causam perdas na rede de fr
 Determinístico por `seed`, para demos e testes reprodutíveis.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import numpy as np
