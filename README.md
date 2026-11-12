@@ -17,11 +17,13 @@ As fontes estão no trabalho original da disciplina, citado no fim deste README.
 
 | Função | Como |
 |---|---|
-| **Status por câmara** | OK, **ATENÇÃO**, **ALARME** (fora de +2 a +8 °C) ou **OFFLINE** (sem leitura há 10 min), ordenados do mais grave ao menos grave |
+| **Visão por UBS** | Um cartão por UBS com cada câmara dentro (Câmara 1, Câmara 2). Os cartões vêm ordenados pela câmara em pior estado e mostram temperatura atual, mínima e máxima, % do tempo em faixa e minutos fora da faixa no período escolhido |
+| **Status por câmara** | OK, **ATENÇÃO**, **ALARME** (fora de +2 a +8 °C) ou **OFFLINE** (sem leitura há 10 min) |
 | **Alerta antecipado** | Tendência linear sobre a média móvel de 40 min (cerca de 1 ciclo do compressor, para não alarmar com a oscilação normal), com compensação do atraso da média. Avisa "sai da faixa em ~N min" |
 | **Incidentes** | Excursões contínuas com duração e pico. Excursões curtas, como uma porta aberta rapidamente, ficam registradas mas só viram incidente acima da tolerância configurável |
 | **Doses a avaliar** | Soma das doses em câmaras com alarme agora ou com incidente nas últimas 24 h, que precisam de avaliação técnica antes do uso |
-| **Relatório** | Incidentes por UBS e exportação em CSV para a conformidade |
+| **Relatório** | Incidentes por UBS (com "em andamento" para excursões abertas) e exportação em CSV para a conformidade |
+| **Controles** | Período analisado (1–14 dias), cenário simulado (sorteia outra semana de eventos; a rede de 11 UBS é fixa), tolerância para virar incidente e horizonte do alerta antecipado. Cada um explica no "?" o que muda no painel |
 
 ![Detalhe da câmara](docs/detalhe_camara.jpg)
 
@@ -40,7 +42,7 @@ A especificação do hardware veio do projeto original: ESP32 + DS18B20, envio a
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
-pytest            # testes das regras: incidentes, alerta antecipado, status, doses, simulador
+pytest            # 7 testes: regras (incidentes, alerta antecipado, status, doses, simulador) e a interface via AppTest
 ```
 
 ## Origem
