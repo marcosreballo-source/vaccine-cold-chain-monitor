@@ -11,7 +11,7 @@ Este é um painel que acompanha a temperatura das câmaras de vacina das UBS e a
 - **Perdas no país:** o TCU estimou cerca de 28 milhões de doses perdidas em 2021–2022, um prejuízo de R$ 1,2 bilhão.
 - **Peso das falhas de conservação:** num estudo regional em SP, 41% das doses expostas a alteração de temperatura foram perdidas, e 70% das falhas tinham causa estrutural (energia, equipamento).
 
-As fontes estão no trabalho original da disciplina, citado no fim deste README.
+As fontes estão no [trabalho original da disciplina](docs/trabalho-original/texto_sistematizado.md).
 
 ## O que o painel faz
 
@@ -48,3 +48,5 @@ pytest            # 7 testes: regras (incidentes, alerta antecipado, status, dos
 ## Origem
 
 Este painel nasceu do trabalho final de **SSC0530 – Introdução a Sistemas de Informação** (ICMC/USP). O trabalho fez o levantamento do problema na rede de frio das UBS de São Carlos, a especificação técnica, a análise de custos e o protótipo de telas no Figma. Aquele trabalho parou no mockup ([protótipo no Figma](https://www.figma.com/proto/Ngcu92GsupdBB0KtYSKLar/Vacinas-Mobile?node-id=1-2&scaling=scale-down&content-scaling=fixed&page-id=0%3A1), feito pelo grupo da disciplina). Este repositório implementa o painel e as regras de alerta.
+
+O texto final entregue na disciplina está em [`docs/trabalho-original/texto_sistematizado.md`](docs/trabalho-original/texto_sistematizado.md).
